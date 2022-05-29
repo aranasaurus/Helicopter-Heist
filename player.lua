@@ -8,7 +8,7 @@ function Player:init(x, y)
 	self:setImage(hook)
 	self:setCenter(0.5, 1)
 	self:moveTo(x, y)
-	self:add()
+	-- self:add()
 	
 	self.speed = 3
 end
