@@ -9,14 +9,14 @@ local geo <const> = pd.geometry
 local vector2D <const> = geo.vector2D
 local point <const> = geo.point
 
-class("ChainSegment").extends(gfx.sprite)
+class("ChainLink").extends()
 
-function ChainSegment:init(p)
-	local image = gfx.image.new("images/chain")
-	self:setImage(image)
+function ChainLink:init(p)
+	-- local image = gfx.image.new("images/chain")
+	-- self:setImage(image)
 	-- self:setCenter(0.5, 0.0)
-	self:moveTo(p)
-	self:add()
+	-- self:moveTo(p)
+	-- self:add()
 	
 	self.prevPoint = p:copy()
 	self.point = p:copy()
@@ -26,10 +26,11 @@ class("Chain").extends()
 
 function Chain:init()
 	-- each chain sprite is 8x30
-	self.segLength = 30
+	-- self.segLength = 30
+	self.segLength = 8
 	
 	-- (240 / 30) + 1, make the chain long enough to cover the screen vertically
-	local numSegments = 9  
+	local numSegments = 32  
 	self.segments = table.create(numSegments, 0)
 	
 	-- start with the hook near the center vertically
@@ -37,7 +38,7 @@ function Chain:init()
 	self.x, self.y = pos:unpack()
 	
 	for i = 1, numSegments, 1 do
-		self.segments[i] = ChainSegment(pos)
+		self.segments[i] = ChainLink(pos)
 		pos.y += self.segLength
 	end
 	
@@ -53,6 +54,18 @@ function Chain:update()
 		if self.x < 400 - 8 then
 			self:moveBy(self.speed, 0)
 		end
+	end
+	
+	gfx.setLineWidth(2)
+	gfx.setColor(gfx.kColorBlack)
+	for i = 1, #self.segments - 1, 1 do
+		local first = self.segments[i]
+		local second = self.segments[i + 1]
+		local segment = pd.geometry.lineSegment.new(
+			first.point.x, first.point.y,
+			second.point.x, second.point.y
+		)
+		gfx.drawLine(segment)
 	end
 end
 
@@ -74,7 +87,6 @@ function Chain:moveBy(x, y)
 		local vel = segment.point - segment.prevPoint
 		segment.prevPoint = segment.point:copy()
 		segment.point += vel + grav
-		segment:moveTo(segment.point)
 	end
 	
 	local segLength = self.segLength
@@ -102,11 +114,11 @@ function Chain:moveBy(x, y)
 				next.point += changeAmount
 			end
 			
-			local startV = vector2D.new(segment.point.x, segment.point.y)
-			local endV = vector2D.new(next.point.x, next.point.y)
-			segment:setRotation(startV:angleBetween(endV))
-			segment:moveTo(segment.point:unpack())
-			next:moveTo(next.point:unpack())
+			-- local startV = vector2D.new(segment.point.x, segment.point.y)
+			-- local endV = vector2D.new(next.point.x, next.point.y)
+			-- segment:setRotation(startV:angleBetween(endV))
+			-- segment:moveTo(segment.point:unpack())
+			-- next:moveTo(next.point:unpack())
 		end
 	end
 end
