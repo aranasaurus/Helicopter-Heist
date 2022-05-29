@@ -29,14 +29,6 @@ local grav = geo.vector2D.new(0, 64)
 local speed = 5
 
 function pd.update()
-	-- Sim
-	for i = 2, #points, 1 do
-		local vel = points[i] - prevPoints[i]
-		prevPoints[i] = points[i]:copy()
-		points[i] += vel
-		points[i] += grav * 0.033
-	end
-	
 	-- Controls
 	if pd.buttonIsPressed(pd.kButtonLeft) then
 		if points[1].x > 8 then
@@ -57,31 +49,52 @@ function pd.update()
 		end
 	end
 	
-	-- Constraints
+	ropeSim()
+	
 	for n = 1, 1, 1 do
-		for i = 1, #points - 1, 1 do
-			local lineVec = points[i] - points[i + 1]
-			local dist = lineVec:magnitude()
-			local error = math.abs(dist - segLength)
-			local changeDir = geo.vector2D.new(0, 0)
-			
-			if dist > segLength then
-				changeDir = (points[i + 1] - points[i]):normalized()
-			elseif dist < segLength then
-				changeDir = lineVec:normalized()
-			end
-			
-			local changeAmount = changeDir * error
-			if i == 1 then
-				points[i + 1] -= changeAmount
-			else
-				points[i] += changeAmount * 0.5
-				points[i + 1] -= changeAmount * 0.5
-			end
-		end
+		applyConstraints()
 	end
 	
-	-- Draw the lines
+	drawChain()
+end
+
+-- Updates all points according to the movement of the first point. Should be called once per frame, after any updates to the first
+-- point's location.
+function ropeSim()
+	for i = 2, #points, 1 do
+		local vel = points[i] - prevPoints[i]
+		prevPoints[i] = points[i]:copy()
+		points[i] += vel
+		points[i] += grav * 0.033
+	end
+end
+
+-- Adjusts the locations of all the points with respect to their neighbors. Should be called at least once per update cycle. C
+-- Calling it more than that will increase the accuracy of the simulation but decrease performance.
+function applyConstraints()
+	for i = 1, #points - 1, 1 do
+		local lineVec = points[i] - points[i + 1]
+		local dist = lineVec:magnitude()
+		local error = math.abs(dist - segLength)
+		local changeDir = geo.vector2D.new(0, 0)
+		
+		if dist > segLength then
+			changeDir = (points[i + 1] - points[i]):normalized()
+		elseif dist < segLength then
+			changeDir = lineVec:normalized()
+		end
+		
+		local changeAmount = changeDir * error
+		if i == 1 then
+			points[i + 1] -= changeAmount
+		else
+			points[i] += changeAmount * 0.5
+			points[i + 1] -= changeAmount * 0.5
+		end
+	end
+end
+
+function drawChain()
 	gfx.clear()
 	gfx.setLineWidth(3)
 	gfx.setColor(gfx.kColorBlack)
