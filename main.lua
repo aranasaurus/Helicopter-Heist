@@ -11,25 +11,30 @@ function clamp(n, low, high)
 	return math.min(math.max(low, n), high)
 end
 
-local numPoints = 10
-local segLength = 24
-local chainLength = numPoints * segLength
-local points = table.create(numPoints, 0)
-local prevPoints = table.create(numPoints, 0)
-local startPoint = geo.point.new(60, 0)
-points[1] = startPoint
-prevPoints[1] = points[1]:copy()
-for i = 2, numPoints, 1 do
-	points[i] = geo.point.new(startPoint.x, startPoint.y + i)
-	prevPoints[i] = points[i]:copy()
-end
-local speed = 5
-local grav = geo.vector2D.new(0, 9.8)
+-- Constants
+local kNumPoints = 10
+local kSegLength = 25
+local kSpeed = 5
+local kGravity = geo.vector2D.new(0, 9.8)
+local kIterationCount = 5
+local kTickTime = 1/pd.display.getRefreshRate()
 
-local constraintIterations = 5
-local tickTime = 1/pd.display.getRefreshRate()
-pd.setGCScaling(0, 0)
-collectgarbage("generational")
+-- State
+local chainLength = kNumPoints * kSegLength
+local points = table.create(kNumPoints, 0)
+local prevPoints = table.create(kNumPoints, 0)
+local startPoint = geo.point.new(60, 0)
+
+function initialize()
+	points[1] = startPoint
+	prevPoints[1] = points[1]:copy()
+	for i = 2, kNumPoints, 1 do
+		points[i] = geo.point.new(startPoint.x, startPoint.y + i)
+		prevPoints[i] = points[i]:copy()
+	end
+	pd.setGCScaling(0, 0)
+	collectgarbage("generational")
+end
 
 -- Updates all points according to the movement of the first point. Should be called once per frame, after any updates to the first point's location.
 function ropeSim()
@@ -43,7 +48,7 @@ function ropeSim()
 
 		-- apply velocity and gravity to each point
 		points[i] += vel
-		points[i] += grav * tickTime
+		points[i] += kGravity * kTickTime
 	end
 end
 
@@ -53,12 +58,12 @@ function applyConstraints()
 		-- TODO: There is a fair amount of garbage being generated here, future me might want to optimize for that a bit later. When/if I get around to that, I think it'd be worth looking into storing the points as LineSegments instead of points.
 		local lineVec = points[i] - points[i + 1]
 		local dist = lineVec:magnitude()
-		local error = math.abs(dist - segLength)
+		local error = math.abs(dist - kSegLength)
 		local changeDir = geo.vector2D.new(0, 0)
 
-		if dist > segLength then
+		if dist > kSegLength then
 			changeDir = (points[i + 1] - points[i]):normalized()
-		elseif dist < segLength then
+		elseif dist < kSegLength then
 			changeDir = lineVec:normalized()
 		end
 
@@ -77,7 +82,7 @@ function drawChain()
 	gfx.setLineWidth(3)
 	gfx.setColor(gfx.kColorBlack)
 	for i = 1, #points - 1, 1 do
-		if (points[i + 1].y >= -segLength or points[i + 1].y >= -segLength) and
+		if (points[i + 1].y >= -kSegLength or points[i + 1].y >= -kSegLength) and
 			((points[i].x >= -8 or points[i + 1].x >= -8) and (points[i].x <= 408 or points[i + 1].x <= 408)) then
 			gfx.drawLine(points[i].x, points[i].y, points[i + 1].x, points[i + 1].y)
 		end
@@ -87,15 +92,15 @@ end
 function pd.update()
 	-- Controls
 	if pd.buttonIsPressed(pd.kButtonLeft) then
-		points[1].x -= speed
+		points[1].x -= kSpeed
 	elseif pd.buttonIsPressed(pd.kButtonRight) then
-		points[1].x += speed
+		points[1].x += kSpeed
 	end
 	points[1].x = clamp(points[1].x, 8, 400 - 8)
 
 	ropeSim()
 
-	for n = 1, constraintIterations, 1 do
+	for n = 1, kIterationCount, 1 do
 		applyConstraints()
 	end
 
@@ -105,8 +110,10 @@ end
 
 pd.inputHandlers.push({
 	cranked = function(change, acceleratedChange)
-		local delta = -acceleratedChange / 360 * speed * 5
+		local delta = -acceleratedChange / 360 * kSpeed * 5
 		points[1].y += delta
 		points[1].y = clamp(points[1].y, -chainLength, chainLength / 2)
 	end
 })
+
+initialize()
