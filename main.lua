@@ -6,14 +6,15 @@ import "CoreLibs/timer"
 local pd <const> = playdate
 local gfx <const> = pd.graphics
 local geo <const> = pd.geometry
+local vector2D <const> = geo.vector2D
 
 function clamp(n, low, high)
 	return math.min(math.max(low, n), high)
 end
 
 -- Constants
-local kNumPoints = 10
-local kSegLength = 25
+local kNumPoints = 8
+local kSegLength = 27
 local kSpeed = 5
 local kGravity = geo.vector2D.new(0, 9.8)
 local kIterationCount = 5
@@ -24,13 +25,25 @@ local chainLength = kNumPoints * kSegLength
 local points = table.create(kNumPoints, 0)
 local prevPoints = table.create(kNumPoints, 0)
 local startPoint = geo.point.new(60, 0)
+local chainImage = gfx.image.new("images/chain")
+local hookImage = gfx.image.new("images/hook")
+local hook = gfx.sprite.new(hookImage)
+local chainSprites = table.create(kNumPoints - 1, 0)
 
 function initialize()
-	points[1] = startPoint
-	prevPoints[1] = points[1]:copy()
-	for i = 2, kNumPoints, 1 do
-		points[i] = geo.point.new(startPoint.x, startPoint.y + i)
+	for i = 1, kNumPoints, 1 do
+		points[i] = startPoint:copy()
 		prevPoints[i] = points[i]:copy()
+		if i < kNumPoints then
+			chainSprites[i] = gfx.sprite.new(chainImage)
+			chainSprites[i]:add()
+			chainSprites[i]:moveTo(points[i].x, points[i].y)
+			chainSprites[i]:setCenter(0.5, 0)
+		else
+			hook:add()
+			hook:moveTo(startPoint.x, startPoint.y + kSegLength)
+			hook:setCenter(0.5, 0)
+		end
 	end
 	pd.setGCScaling(0, 0)
 	collectgarbage("generational")
@@ -77,15 +90,22 @@ function applyConstraints()
 	end
 end
 
+function shouldDrawPoint(p)
+	return p.y <= 240 + kSegLength and p.y >= -kSegLength and p.x >= -kSegLength and p.x <= 400 + kSegLength
+end
+
 function drawChain()
-	gfx.clear()
-	gfx.setLineWidth(3)
-	gfx.setColor(gfx.kColorBlack)
-	for i = 1, #points - 1, 1 do
-		if (points[i + 1].y >= -kSegLength or points[i + 1].y >= -kSegLength) and
-			((points[i].x >= -8 or points[i + 1].x >= -8) and (points[i].x <= 408 or points[i + 1].x <= 408)) then
-			gfx.drawLine(points[i].x, points[i].y, points[i + 1].x, points[i + 1].y)
+	local up = vector2D.new(0, 1)
+	for i = 1, kNumPoints - 1, 1 do
+		chainSprites[i]:moveTo(points[i].x, points[i].y)
+		if shouldDrawPoint(points[i]) or shouldDrawPoint(points[i+1]) then
+			chainSprites[i]:setRotation(up:angleBetween(points[i+1] - points[i]))
 		end
+	end
+
+	hook:moveTo(points[kNumPoints].x, points[kNumPoints].y)
+	if shouldDrawPoint(points[kNumPoints]) then
+		hook:setRotation(up:angleBetween(points[kNumPoints] - points[kNumPoints-1]))
 	end
 end
 
@@ -105,14 +125,15 @@ function pd.update()
 	end
 
 	drawChain()
+	gfx.sprite.update()
 	pd.drawFPS()
 end
 
 pd.inputHandlers.push({
 	cranked = function(change, acceleratedChange)
-		local delta = -acceleratedChange / 360 * kSpeed * 5
+		local delta = -acceleratedChange / 360 * kSpeed * 6
 		points[1].y += delta
-		points[1].y = clamp(points[1].y, -chainLength, chainLength / 2)
+		points[1].y = clamp(points[1].y, -chainLength + hook.height / 2, 0)
 	end
 })
 
