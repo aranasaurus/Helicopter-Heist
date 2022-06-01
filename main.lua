@@ -14,38 +14,46 @@ end
 
 -- Constants
 local kNumPoints = 8
+local kHookConnectionPoint = kNumPoints + 1
+local kHookPoint = kHookConnectionPoint + 1
 local kSegLength = 27
 local kSpeed = 5
-local kGravity = geo.vector2D.new(0, 9.8)
+local kGravity = vector2D.new(0, 9.80)
+local kDragFactor = vector2D.new(0.0125, 0.025)
 local kIterationCount = 5
 local kTickTime = 1/pd.display.getRefreshRate()
 
 -- State
 local chainLength = kNumPoints * kSegLength
-local points = table.create(kNumPoints, 0)
-local prevPoints = table.create(kNumPoints, 0)
-local startPoint = geo.point.new(60, 0)
+local points = table.create(kHookPoint, 0)
+local prevPoints = table.create(kHookPoint, 0)
+local startPoint = geo.point.new(60, -kSegLength)
 local chainImage = gfx.image.new("images/chain")
+local chainSprites = table.create(kNumPoints, 0)
 local hookImage = gfx.image.new("images/hook")
 local hook = gfx.sprite.new(hookImage)
-local chainSprites = table.create(kNumPoints - 1, 0)
 
 function initialize()
 	for i = 1, kNumPoints, 1 do
 		points[i] = startPoint:copy()
 		prevPoints[i] = points[i]:copy()
-		if i < kNumPoints then
-			chainSprites[i] = gfx.sprite.new(chainImage)
-			chainSprites[i]:add()
-			chainSprites[i]:moveTo(points[i].x, points[i].y)
-			chainSprites[i]:setCenter(0.5, 0)
-		else
-			hook:add()
-			hook:moveTo(startPoint.x, startPoint.y + kSegLength)
-			hook:setCenter(0.5, 0)
-		end
+		chainSprites[i] = gfx.sprite.new(chainImage)
+		chainSprites[i]:add()
+		chainSprites[i]:moveTo(points[i].x, points[i].y)
+		chainSprites[i]:setCenter(0.5, 0)
 	end
+	points[kHookConnectionPoint] = points[kNumPoints]:copy()
+	prevPoints[kHookConnectionPoint] = points[kHookConnectionPoint]:copy()
+	points[kHookPoint] = points[kHookConnectionPoint] + vector2D.new(0, kSegLength)
+	prevPoints[kHookPoint] = points[kHookPoint]:copy()
+	hook:add()
+	hook:moveTo(startPoint.x, startPoint.y + kSegLength)
+	hook:setCenter(0.5, 0)
+
+	-- Use all extra time per frame to run the garbage collector
 	pd.setGCScaling(0, 0)
+
+	-- Use the Lua GC mode that's optimized for short lived tiny objects
 	collectgarbage("generational")
 end
 
@@ -54,6 +62,8 @@ function ropeSim()
 	for i = 2, #points, 1 do
 		-- calculate velocity using previous point
 		local vel = points[i] - prevPoints[i]
+		vel.x *= 1 - kDragFactor.x
+		vel.y *= 1 - kDragFactor.y
 
 		-- update previous point to current values (NOTE: this is setting the values not copying the points, which saves us some gc time)
 		prevPoints[i].x = points[i].x
@@ -63,6 +73,10 @@ function ropeSim()
 		points[i] += vel
 		points[i] += kGravity * kTickTime
 	end
+
+	-- Make hook "heavier" by applying more gravity to it
+	points[kHookConnectionPoint] += kGravity * kTickTime * 0.25
+	points[kHookPoint] += kGravity * kTickTime
 end
 
 -- Adjusts the locations of all the points with respect to their neighbors. Should be called at least once per update cycle. Calling it more than that will increase the accuracy of the simulation but decrease performance.
@@ -96,16 +110,16 @@ end
 
 function drawChain()
 	local up = vector2D.new(0, 1)
-	for i = 1, kNumPoints - 1, 1 do
+	for i = 1, kNumPoints, 1 do
 		chainSprites[i]:moveTo(points[i].x, points[i].y)
 		if shouldDrawPoint(points[i]) or shouldDrawPoint(points[i+1]) then
 			chainSprites[i]:setRotation(up:angleBetween(points[i+1] - points[i]))
 		end
 	end
 
-	hook:moveTo(points[kNumPoints].x, points[kNumPoints].y)
-	if shouldDrawPoint(points[kNumPoints]) then
-		hook:setRotation(up:angleBetween(points[kNumPoints] - points[kNumPoints-1]))
+	hook:moveTo(points[kHookConnectionPoint].x, points[kHookConnectionPoint].y)
+	if shouldDrawPoint(points[kHookConnectionPoint]) or shouldDrawPoint(points[kHookPoint]) then
+		hook:setRotation(up:angleBetween(points[kHookPoint] - points[kHookConnectionPoint]))
 	end
 end
 
