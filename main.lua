@@ -1,5 +1,6 @@
 import "CoreLibs/object"
 import "CoreLibs/graphics"
+import "CoreLibs/animation"
 import "CoreLibs/sprites"
 import "CoreLibs/timer"
 
@@ -33,6 +34,12 @@ local chainSprites = table.create(kNumPoints, 0)
 local hookImage = gfx.image.new("images/hook")
 local hook = gfx.sprite.new(hookImage)
 
+local arrowUp = gfx.image.new("images/arrow-up")
+local arrowLeft = gfx.image.new("images/arrow-left")
+local arrowRight = gfx.image.new("images/arrow-right")
+local arrow = gfx.sprite.new()
+local arrowAnim = gfx.animation.blinker.new()
+
 function initialize()
     for i = 1, kNumPoints, 1 do
         points[i] = startPoint:copy()
@@ -49,6 +56,11 @@ function initialize()
     hook:add()
     hook:moveTo(startPoint.x, startPoint.y + kSegLength)
     hook:setCenter(0.5, 0)
+
+    arrow:add()
+    arrow:setVisible(false)
+    arrow:setZIndex(32767)
+    arrowAnim:stop()
 
     -- Use all extra time per frame to run the garbage collector
     pd.setGCScaling(0, 0)
@@ -104,26 +116,66 @@ function applyConstraints()
     end
 end
 
-function shouldDrawPoint(p)
-    return p.y <= 240 + kSegLength and p.y >= -kSegLength and p.x >= -kSegLength and p.x <= 400 + kSegLength
+function shouldDrawSprite(s)
+    return pd.display:getRect():intersects(s:getBoundsRect())
 end
 
 function drawChain()
     local up = vector2D.new(0, 1)
     for i = 1, kNumPoints, 1 do
         chainSprites[i]:moveTo(points[i].x, points[i].y)
-        if shouldDrawPoint(points[i]) or shouldDrawPoint(points[i+1]) then
+        if shouldDrawSprite(chainSprites[i]) then
             chainSprites[i]:setRotation(up:angleBetween(points[i+1] - points[i]))
         end
     end
 
     hook:moveTo(points[kHookConnectionPoint].x, points[kHookConnectionPoint].y)
-    if shouldDrawPoint(points[kHookConnectionPoint]) or shouldDrawPoint(points[kHookPoint]) then
+    if shouldDrawSprite(hook) then
         hook:setRotation(up:angleBetween(points[kHookPoint] - points[kHookConnectionPoint]))
     end
 end
 
+function drawArrow()
+    -- bail early and turn off the arrow and its animation if the hook is on the screen
+    if shouldDrawSprite(hook) then
+        arrowAnim:stop()
+        arrow:setUpdatesEnabled(false)
+        arrow:setVisible(false)
+        return
+    end
+
+    -- start the animation and re-enable the arrow sprite
+    arrow:setUpdatesEnabled(true)
+    if not arrowAnim.running then
+        arrowAnim:startLoop()
+    end
+
+    -- update the location of the arrow to match the midpoint of the hook
+    local p = (points[kHookPoint] .. points[kHookConnectionPoint]):midPoint()
+    local margin = 4
+    local hOffset = arrowUp.width / 2
+    local vOffset = arrowUp.height / 2
+    local x = clamp(p.x, margin + hOffset, pd.display.getWidth() - hOffset - margin)
+    local y = clamp(p.y, margin + vOffset, pd.display.getHeight() - vOffset - margin)
+    arrow:moveTo(x, y)
+
+    -- pick the right image / orientation
+    if p.y < 0 then
+        arrow:setImage(arrowUp)
+    elseif p.x < 0 then
+        arrow:setImage(arrowLeft)
+    elseif p.x > 400 then
+        arrow:setImage(arrowRight)
+    end
+
+    -- update visibility based on the animation state
+    arrow:setVisible(arrowAnim.on)
+end
+
+
 function pd.update()
+    gfx.animation.blinker.updateAll()
+
     -- Controls
     if pd.buttonIsPressed(pd.kButtonLeft) then
         points[1].x -= kSpeed
@@ -139,6 +191,8 @@ function pd.update()
     end
 
     drawChain()
+    drawArrow()
+
     gfx.sprite.update()
     pd.drawFPS()
 end
