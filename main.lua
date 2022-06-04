@@ -9,8 +9,15 @@ local gfx <const> = pd.graphics
 local geo <const> = pd.geometry
 local vector2D <const> = geo.vector2D
 
+import "scripts/chain"
+
+-- Util functions
 function clamp(n, low, high)
     return math.min(math.max(low, n), high)
+end
+
+function shouldDrawSprite(s)
+    return pd.display:getRect():intersects(s:getBoundsRect())
 end
 
 -- Constants
@@ -25,43 +32,9 @@ local kIterationCount = 5
 local kTickTime = 1/pd.display.getRefreshRate()
 
 -- State
-local chainLength = kNumPoints * kSegLength
-local points = table.create(kHookPoint, 0)
-local prevPoints = table.create(kHookPoint, 0)
-local startPoint = geo.point.new(60, -kSegLength)
-local chainImage = gfx.image.new("images/chain")
-local chainSprites = table.create(kNumPoints, 0)
-local hookImage = gfx.image.new("images/hook")
-local hook = gfx.sprite.new(hookImage)
-
-local arrowUp = gfx.image.new("images/arrow-up")
-local arrowLeft = gfx.image.new("images/arrow-left")
-local arrowRight = gfx.image.new("images/arrow-right")
-local arrow = gfx.sprite.new()
-local arrowAnim = gfx.animation.blinker.new()
+local player = Chain(geo.point.new(60, -27), 8, 27)
 
 function initialize()
-    for i = 1, kNumPoints, 1 do
-        points[i] = startPoint:copy()
-        prevPoints[i] = points[i]:copy()
-        chainSprites[i] = gfx.sprite.new(chainImage)
-        chainSprites[i]:add()
-        chainSprites[i]:moveTo(points[i].x, points[i].y)
-        chainSprites[i]:setCenter(0.5, 0)
-    end
-    points[kHookConnectionPoint] = points[kNumPoints]:copy()
-    prevPoints[kHookConnectionPoint] = points[kHookConnectionPoint]:copy()
-    points[kHookPoint] = points[kHookConnectionPoint] + vector2D.new(0, kSegLength)
-    prevPoints[kHookPoint] = points[kHookPoint]:copy()
-    hook:add()
-    hook:moveTo(startPoint.x, startPoint.y + kSegLength)
-    hook:setCenter(0.5, 0)
-
-    arrow:add()
-    arrow:setVisible(false)
-    arrow:setZIndex(32767)
-    arrowAnim:stop()
-
     -- Use all extra time per frame to run the garbage collector
     pd.setGCScaling(0, 0)
 
@@ -69,140 +42,10 @@ function initialize()
     collectgarbage("generational")
 end
 
--- Updates all points according to the movement of the first point. Should be called once per frame, after any updates to the first point's location.
-function ropeSim()
-    for i = 2, #points, 1 do
-        -- calculate velocity using previous point
-        local vel = points[i] - prevPoints[i]
-        vel.x *= 1 - kDragFactor.x
-        vel.y *= 1 - kDragFactor.y
-
-        -- update previous point to current values (NOTE: this is setting the values not copying the points, which saves us some gc time)
-        prevPoints[i].x = points[i].x
-        prevPoints[i].y = points[i].y
-
-        -- apply velocity and gravity to each point
-        points[i] += vel
-        points[i] += kGravity * kTickTime
-    end
-
-    -- Make hook "heavier" by applying more gravity to it
-    points[kHookConnectionPoint] += kGravity * kTickTime * 0.25
-    points[kHookPoint] += kGravity * kTickTime
-end
-
--- Adjusts the locations of all the points with respect to their neighbors. Should be called at least once per update cycle. Calling it more than that will increase the accuracy of the simulation but decrease performance.
-function applyConstraints()
-    for i = 1, #points - 1, 1 do
-        -- TODO: There is a fair amount of garbage being generated here, future me might want to optimize for that a bit later. When/if I get around to that, I think it'd be worth looking into storing the points as LineSegments instead of points.
-        local lineVec = points[i] - points[i + 1]
-        local dist = lineVec:magnitude()
-        local error = math.abs(dist - kSegLength)
-        local changeDir = geo.vector2D.new(0, 0)
-
-        if dist > kSegLength then
-            changeDir = (points[i + 1] - points[i]):normalized()
-        elseif dist < kSegLength then
-            changeDir = lineVec:normalized()
-        end
-
-        local changeAmount = changeDir * error
-        if i == 1 then
-            points[i + 1] -= changeAmount
-        else
-            points[i] += changeAmount * 0.5
-            points[i + 1] -= changeAmount * 0.5
-        end
-    end
-end
-
-function shouldDrawSprite(s)
-    return pd.display:getRect():intersects(s:getBoundsRect())
-end
-
-function drawChain()
-    local up = vector2D.new(0, 1)
-    for i = 1, kNumPoints, 1 do
-        chainSprites[i]:moveTo(points[i].x, points[i].y)
-        if shouldDrawSprite(chainSprites[i]) then
-            chainSprites[i]:setRotation(up:angleBetween(points[i+1] - points[i]))
-        end
-    end
-
-    hook:moveTo(points[kHookConnectionPoint].x, points[kHookConnectionPoint].y)
-    if shouldDrawSprite(hook) then
-        hook:setRotation(up:angleBetween(points[kHookPoint] - points[kHookConnectionPoint]))
-    end
-end
-
-function drawArrow()
-    -- bail early and turn off the arrow and its animation if the hook is on the screen
-    if shouldDrawSprite(hook) then
-        arrowAnim:stop()
-        arrow:setUpdatesEnabled(false)
-        arrow:setVisible(false)
-        return
-    end
-
-    -- start the animation and re-enable the arrow sprite
-    arrow:setUpdatesEnabled(true)
-    if not arrowAnim.running then
-        arrowAnim:startLoop()
-    end
-
-    -- update the location of the arrow to match the midpoint of the hook
-    local p = (points[kHookPoint] .. points[kHookConnectionPoint]):midPoint()
-    local margin = 4
-    local hOffset = arrowUp.width / 2
-    local vOffset = arrowUp.height / 2
-    local x = clamp(p.x, margin + hOffset, pd.display.getWidth() - hOffset - margin)
-    local y = clamp(p.y, margin + vOffset, pd.display.getHeight() - vOffset - margin)
-    arrow:moveTo(x, y)
-
-    -- pick the right image / orientation
-    if p.y < 0 then
-        arrow:setImage(arrowUp)
-    elseif p.x < 0 then
-        arrow:setImage(arrowLeft)
-    elseif p.x > 400 then
-        arrow:setImage(arrowRight)
-    end
-
-    -- update visibility based on the animation state
-    arrow:setVisible(arrowAnim.on)
-end
-
-
 function pd.update()
     gfx.animation.blinker.updateAll()
-
-    -- Controls
-    if pd.buttonIsPressed(pd.kButtonLeft) then
-        points[1].x -= kSpeed
-    elseif pd.buttonIsPressed(pd.kButtonRight) then
-        points[1].x += kSpeed
-    end
-    points[1].x = clamp(points[1].x, 8, 400 - 8)
-
-    ropeSim()
-
-    for n = 1, kIterationCount, 1 do
-        applyConstraints()
-    end
-
-    drawChain()
-    drawArrow()
-
     gfx.sprite.update()
     pd.drawFPS()
 end
-
-pd.inputHandlers.push({
-    cranked = function(change, acceleratedChange)
-        local delta = -acceleratedChange / 360 * kSpeed * 6
-        points[1].y += delta
-        points[1].y = clamp(points[1].y, -chainLength + hook.height / 2, 0)
-    end
-})
 
 initialize()
