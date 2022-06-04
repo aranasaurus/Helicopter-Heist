@@ -16,7 +16,7 @@ function Player:init(x, y)
     self.speed = 5
 
     self.chain = Chain(x, y, 8, 27)
-    self.arrow = Arrow(4)
+    self.arrow = Arrow(self.chain.hook, 4)
 
     self:add()
 end
@@ -34,6 +34,4 @@ function Player:update()
     self.chain:moveBy(dx, dy)
 
     Player.super.update(self)
-
-    self.arrow:track(self.chain.hook)
 end
