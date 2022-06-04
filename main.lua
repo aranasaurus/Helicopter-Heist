@@ -9,7 +9,7 @@ local gfx <const> = pd.graphics
 local geo <const> = pd.geometry
 local vector2D <const> = geo.vector2D
 
-import "scripts/chain"
+import "scripts/player"
 
 -- Util functions
 function clamp(n, low, high)
@@ -32,7 +32,7 @@ local kIterationCount = 5
 local kTickTime = 1/pd.display.getRefreshRate()
 
 -- State
-local player = Chain(geo.point.new(60, -27), 8, 27)
+local player = Player(60, -27)
 
 function initialize()
     -- Use all extra time per frame to run the garbage collector

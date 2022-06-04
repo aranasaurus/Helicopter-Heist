@@ -1,6 +1,5 @@
 import "CoreLibs/object"
 import "CoreLibs/graphics"
-import "CoreLibs/animation"
 import "CoreLibs/sprites"
 
 local pd <const> = playdate
@@ -14,9 +13,7 @@ class("Chain").extends(gfx.sprite)
 local kGravity = vector2D.new(0, 9.80)
 local kTickTime = 1/pd.display.getRefreshRate()
 
--- State
-
-function Chain:init(startPoint, numPoints, segLength)
+function Chain:init(x, y, numPoints, segLength)
     self.speed = 5
     self.dragFactor = vector2D.new(0.0125, 0.025)
     self.iterationCount = 5
@@ -25,11 +22,9 @@ function Chain:init(startPoint, numPoints, segLength)
     self.hookConnectionPointIdx = numPoints + 1
     self.hookPointIdx = self.hookConnectionPointIdx + 1
     self.segLength = segLength
-    self.maxChainLength = numPoints * segLength
 
     local chainImage = gfx.image.new("images/chain")
     local hookImage = gfx.image.new("images/hook")
-    local startPoint = geo.point.new(60, -segLength)
 
     -- TODO: Can the points and prevPoints tables be removed by just using chainSprites?
     self.points = table.create(hookPointIdx, 0)
@@ -37,14 +32,10 @@ function Chain:init(startPoint, numPoints, segLength)
     self.chainSprites = table.create(numPoints, 0)
     self.hook = gfx.sprite.new(hookImage)
 
-    self.arrowUp = gfx.image.new("images/arrow-up")
-    self.arrowLeft = gfx.image.new("images/arrow-left")
-    self.arrowRight = gfx.image.new("images/arrow-right")
-    self.arrow = gfx.sprite.new()
-    self.arrowAnim = gfx.animation.blinker.new()
+    self.maxChainLength = numPoints * segLength + self.hook.height
 
     for i = 1, numPoints, 1 do
-        self.points[i] = startPoint:copy()
+        self.points[i] = geo.point.new(x, y)
         self.prevPoints[i] = self.points[i]:copy()
         self.chainSprites[i] = gfx.sprite.new(chainImage)
         self.chainSprites[i]:add()
@@ -58,13 +49,8 @@ function Chain:init(startPoint, numPoints, segLength)
     self.prevPoints[self.hookPointIdx] = self.points[self.hookPointIdx]:copy()
 
     self.hook:add()
-    self.hook:moveTo(startPoint.x, startPoint.y + segLength)
+    self.hook:moveTo(x, y + segLength)
     self.hook:setCenter(0.5, 0)
-
-    self.arrow:add()
-    self.arrow:setVisible(false)
-    self.arrow:setZIndex(32767)
-    self.arrowAnim:stop()
 
     self:add()
 end
@@ -116,41 +102,10 @@ function Chain:applyConstraints()
     end
 end
 
-function Chain:drawArrow()
-    -- bail early and turn off the arrow and its animation if the hook is on the screen
-    if shouldDrawSprite(self.hook) then
-        self.arrowAnim:stop()
-        self.arrow:setUpdatesEnabled(false)
-        self.arrow:setVisible(false)
-        return
-    end
-
-    -- start the animation and re-enable the arrow sprite
-    self.arrow:setUpdatesEnabled(true)
-    if not self.arrowAnim.running then
-        self.arrowAnim:startLoop()
-    end
-
-    -- update the location of the arrow to match the midpoint of the hook
-    local p = (self.points[self.hookPointIdx] .. self.points[self.hookConnectionPointIdx]):midPoint()
-    local margin = 4
-    local hOffset = self.arrowUp.width / 2
-    local vOffset = self.arrowUp.height / 2
-    local x = clamp(p.x, margin + hOffset, pd.display.getWidth() - hOffset - margin)
-    local y = clamp(p.y, margin + vOffset, pd.display.getHeight() - vOffset - margin)
-    self.arrow:moveTo(x, y)
-
-    -- pick the right image / orientation
-    if p.y < 0 then
-        self.arrow:setImage(self.arrowUp)
-    elseif p.x < 0 then
-        self.arrow:setImage(self.arrowLeft)
-    elseif p.x > 400 then
-        self.arrow:setImage(self.arrowRight)
-    end
-
-    -- update visibility based on the animation state
-    self.arrow:setVisible(self.arrowAnim.on)
+function Chain:moveBy(dx, dy)
+    -- Keep the chain/hook within reach of the screen
+    self.points[1].y = clamp(self.points[1].y + dy, -self.maxChainLength + self.hook.height, 0)
+    self.points[1].x = clamp(self.points[1].x + dx, 8, 400 - 8)
 end
 
 function Chain:update()
@@ -167,20 +122,6 @@ function Chain:update()
         self.hook:setRotation(up:angleBetween(self.points[self.hookPointIdx] - self.points[self.hookConnectionPointIdx]))
     end
 
-    -- Controls
-    if pd.buttonIsPressed(pd.kButtonLeft) then
-        self.points[1].x -= self.speed
-    elseif pd.buttonIsPressed(pd.kButtonRight) then
-        self.points[1].x += self.speed
-    end
-    local change, acceleratedChange = pd.getCrankChange()
-    local delta = -acceleratedChange / 360 * self.speed * 6
-    self.points[1].y += delta
-
-    -- Keep the chain/hook within reach of the screen
-    self.points[1].y = clamp(self.points[1].y, -self.maxChainLength + self.hook.height, 0)
-    self.points[1].x = clamp(self.points[1].x, 8, 400 - 8)
-
     self:simStep()
 
     for n = 1, self.iterationCount, 1 do
@@ -188,6 +129,4 @@ function Chain:update()
     end
 
     Chain.super.update(self)
-
-    self:drawArrow()
 end
