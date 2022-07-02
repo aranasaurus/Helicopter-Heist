@@ -10,6 +10,7 @@ local geo <const> = pd.geometry
 local vector2D <const> = geo.vector2D
 
 import "scripts/player"
+import "scripts/loot"
 
 -- Util functions
 function clamp(n, low, high)
@@ -29,6 +30,8 @@ function initialize()
 
     -- Use the Lua GC mode that's optimized for short lived tiny objects
     collectgarbage("generational")
+
+    Loot(pd.display.getWidth() / 2, pd.display.getHeight() / 2, 1)
 end
 
 function pd.update()
