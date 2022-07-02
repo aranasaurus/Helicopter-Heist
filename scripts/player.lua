@@ -15,7 +15,7 @@ class("Player").extends(gfx.sprite)
 function Player:init(x, y)
     self.speed = 5
 
-    self.chain = Chain(x, y, 8, 27)
+    self.chain = Chain(x, y, 5, 48)
     self.arrow = Arrow(self.chain.hook, 4)
 
     self:add()

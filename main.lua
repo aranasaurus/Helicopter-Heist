@@ -20,17 +20,6 @@ function shouldDrawSprite(s)
     return pd.display:getRect():intersects(s:getBoundsRect())
 end
 
--- Constants
-local kNumPoints = 8
-local kHookConnectionPoint = kNumPoints + 1
-local kHookPoint = kHookConnectionPoint + 1
-local kSegLength = 27
-local kSpeed = 5
-local kGravity = vector2D.new(0, 9.80)
-local kDragFactor = vector2D.new(0.0125, 0.025)
-local kIterationCount = 5
-local kTickTime = 1/pd.display.getRefreshRate()
-
 -- State
 local player = Player(60, -27)
 

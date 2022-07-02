@@ -112,9 +112,7 @@ function Chain:update()
     local up = vector2D.new(0, 1)
     for i = 1, self.numPoints, 1 do
         self.chainSprites[i]:moveTo(self.points[i].x, self.points[i].y)
-        if shouldDrawSprite(self.chainSprites[i]) then
-            self.chainSprites[i]:setRotation(up:angleBetween(self.points[i+1] - self.points[i]))
-        end
+        self.chainSprites[i]:setRotation(up:angleBetween(self.points[i+1] - self.points[i]))
     end
 
     self.hook:moveTo(self.points[self.hookConnectionPointIdx].x, self.points[self.hookConnectionPointIdx].y)
