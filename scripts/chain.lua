@@ -51,6 +51,8 @@ function Chain:init(x, y, numPoints, segLength)
     self.hook:add()
     self.hook:moveTo(x, y + segLength)
     self.hook:setCenter(0.5, 0)
+    self.hook:setCollisionsEnabled(true)
+    self.hook:setCollideRect(0, 0, self.hook:getSize())
 
     self:add()
 end
@@ -115,9 +117,30 @@ function Chain:update()
         self.chainSprites[i]:setRotation(up:angleBetween(self.points[i+1] - self.points[i]))
     end
 
-    self.hook:moveTo(self.points[self.hookConnectionPointIdx].x, self.points[self.hookConnectionPointIdx].y)
+    local hookGoal = self.points[self.hookConnectionPointIdx]
+    if self.payload == nil then
+        local _, _, collisions, _ = self.hook:checkCollisions(hookGoal)
+        for _, collision in ipairs(collisions) do
+            if self.hook:alphaCollision(collision.other) then
+                self.payload = collision.other
+                self.payload:setCenter(0.155, 0.9685)
+            end
+        end
+
+        self.hook:moveTo(hookGoal)
+        local bounds = self.hook:getBoundsRect()
+        self.hook:setCollideRect(0, 0, bounds.width, bounds.height)
+    else
+        self.hook:moveTo(hookGoal)
+        self.payload:moveTo(self.points[self.hookPointIdx])
+    end
+
     if shouldDrawSprite(self.hook) then
         self.hook:setRotation(up:angleBetween(self.points[self.hookPointIdx] - self.points[self.hookConnectionPointIdx]))
+    end
+
+    if self.payload ~= nil and shouldDrawSprite(self.payload) then
+        self.payload:setRotation(up:angleBetween(self.points[self.hookPointIdx] - self.points[self.hookConnectionPointIdx]))
     end
 
     self:simStep()

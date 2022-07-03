@@ -22,7 +22,7 @@ function shouldDrawSprite(s)
 end
 
 -- State
-local player = Player(60, -27)
+local player = Player(60, -55)
 
 function initialize()
     -- Use all extra time per frame to run the garbage collector

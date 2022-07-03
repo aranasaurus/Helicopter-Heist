@@ -13,4 +13,5 @@ function Loot:init(x, y, i)
     self:setImage(image)
     self:moveTo(x, y)
     self:add()
+    self:setCollideRect(0, 0, image:getSize())
 end

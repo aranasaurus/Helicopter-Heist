@@ -29,8 +29,18 @@ function Player:update()
     elseif pd.buttonIsPressed(pd.kButtonRight) then
         dx += self.speed
     end
+
     local change, acceleratedChange = pd.getCrankChange()
     local dy = -acceleratedChange / 360 * self.speed * 6
+
+    if pd.isSimulator then
+        if pd.buttonIsPressed(pd.kButtonUp) then
+            dy -= self.speed
+        elseif pd.buttonIsPressed(pd.kButtonDown) then
+            dy += self.speed
+        end
+    end
+
     self.chain:moveBy(dx, dy)
 
     Player.super.update(self)
