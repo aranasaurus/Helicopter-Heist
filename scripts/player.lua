@@ -43,5 +43,13 @@ function Player:update()
 
     self.chain:moveBy(dx, dy)
 
+    if pd.buttonJustPressed(pd.kButtonB) then
+        self.chain:releasePayload()
+    end
+
+    if pd.buttonJustReleased(pd.kButtonB) then
+        self.chain:reenablePayloads()
+    end
+
     Player.super.update(self)
 end

@@ -9,10 +9,6 @@ local vector2D <const> = geo.vector2D
 
 class("Chain").extends(gfx.sprite)
 
--- Constants
-local kGravity = vector2D.new(0, 9.80)
-local kTickTime = 1/pd.display.getRefreshRate()
-
 function Chain:init(x, y, numPoints, segLength)
     self.speed = 5
     self.dragFactor = vector2D.new(0.0125, 0.025)
@@ -123,7 +119,12 @@ function Chain:update()
         for _, collision in ipairs(collisions) do
             if self.hook:alphaCollision(collision.other) then
                 self.payload = collision.other
-                self.payload:setCenter(0.155, 0.9685)
+                self.payload.hooked = true
+                if self.hook:getCenterPoint().x > collision.touch.x then
+                    self.payload:setCenter(0.155, 0.9685)
+                else
+                    self.payload:setCenter(1 - 0.155, 0.9685)
+                end
             end
         end
 
@@ -150,4 +151,16 @@ function Chain:update()
     end
 
     Chain.super.update(self)
+end
+
+function Chain:releasePayload()
+    if self.payload ~= nil then
+        self.payload.hooked = false
+        self.payload = nil
+    end
+    self.hook:setCollisionsEnabled(false)
+end
+
+function Chain:reenablePayloads()
+    self.hook:setCollisionsEnabled(true)
 end

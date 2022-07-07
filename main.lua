@@ -9,6 +9,10 @@ local gfx <const> = pd.graphics
 local geo <const> = pd.geometry
 local vector2D <const> = geo.vector2D
 
+-- Global Constants
+kGravity = vector2D.new(0, 9.80)
+kTickTime = 1/pd.display.getRefreshRate()
+
 import "scripts/player"
 import "scripts/loot"
 
